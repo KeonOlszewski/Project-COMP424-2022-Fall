@@ -23,9 +23,22 @@ class StudentAgent(Agent):
         }
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
-        valid_moves = self.get_all_moves(chess_board, my_pos, adv_pos, max_step)
-        chosen_move = valid_moves[-1] #TODO make an algorithm that picks moves better
+        valid_moves = self.get_valid_moves(chess_board, my_pos, adv_pos, max_step)
+        chosen_move =  self.get_best_move(chess_board, valid_moves)
         return (chosen_move[0],chosen_move[1]), chosen_move[2]
+
+    #Improve best move algorithm
+    def get_best_move(self, chess_board, valid_moves):
+        scores = []
+        for i in range(len(valid_moves)):
+            move = valid_moves[i]
+            chess_board[move[0], move[1], move[2]] = True
+            scores.append(self.get_score(chess_board, (move[0],move[1])))
+            chess_board[move[0], move[1], move[2]] = False
+        return valid_moves[scores.index(max(scores))]
+
+    def get_score(self, chess_board, pos):
+        return len(self.get_valid_positions(chess_board, pos, pos, 2*len(chess_board)))
 
     def get_moves_from_position(self, chess_board, pos, adv_pos, max_step, moves, steps):
         #Up, Right, Down, Left
@@ -45,8 +58,8 @@ class StudentAgent(Agent):
         if not chess_board[x][y][self.dir_map["l"]] and (x, y-1) not in moves and not (x, y-1) == adv_pos:
             new_moves.append((x, y-1, steps+1))
         return new_moves
-    
-    def get_all_moves(self, chess_board, og_pos, adv_pos, max_step):
+
+    def get_valid_positions(self, chess_board, og_pos, adv_pos, max_step):
         moves = [og_pos]
         new_moves = [(og_pos[0],og_pos[1],0)] #starting position with 0 steps so far
         while len(new_moves) > 0:
@@ -56,6 +69,10 @@ class StudentAgent(Agent):
             for move in new:
                 moves.append((move[0], move[1]))
             new_moves += new
+        return moves
+    
+    def get_valid_moves(self, chess_board, og_pos, adv_pos, max_step):
+        moves = self.get_valid_positions(chess_board, og_pos, adv_pos, max_step)
         moves_with_barrier = []
         for move in moves:
             if not chess_board[move[0]][move[1]][self.dir_map["u"]]:

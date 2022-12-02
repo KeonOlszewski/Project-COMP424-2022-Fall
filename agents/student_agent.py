@@ -50,8 +50,8 @@ class StudentAgent(Agent):
                 nodes[i].simulate()
                 winrates[i] = nodes[i].get_winrate()
         
-        max_winrate= max(winrates)
-        champion_node = nodes[winrates.index(max_winrate)]
+        max_winrate_index= np.argmax(winrates)
+        champion_node = nodes[max_winrate_index]
         return champion_node.get_mypos(), champion_node.get_barrier()
 
 
@@ -191,7 +191,9 @@ class StudentAgent(Agent):
                 else:
                     (x, y), dir = self.randmov(adv_pos, my_pos, chess_board)
                     adv_pos = (x, y)
-                
+                if dir is None:
+                    self.winrate = self.num_wins / self.num_games
+                    return
                 my_turn = not my_turn # change turn
                 self.set_barrier(x, y, dir, chess_board)
             
@@ -250,9 +252,13 @@ class StudentAgent(Agent):
             # Put Barrier
             dir = np.random.randint(0, 4)
             r, c = my_pos
+            k = 0
             while chess_board[r, c, dir]:
+                k += 1
                 dir = np.random.randint(0, 4)
-
+                if k > 10:
+                    dir = None
+                    break
             return my_pos, dir
         
 

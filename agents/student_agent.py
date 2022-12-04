@@ -46,7 +46,7 @@ class StudentAgent(Agent):
         #if no good moves then just simulate with full list of moves incase something was missed
         if len(valid_moves) == 0:
             valid_moves = self.get_valid_moves(chess_board, my_pos, adv_pos, max_step)
-        #make nodes for every valid move (might be overkill)
+        #make nodes for every valid moves
         self.root = self.MCNode(chess_board, my_pos, None, adv_pos, max_step, True, None)
         for move in valid_moves:
             new_board = deepcopy(chess_board)
@@ -451,57 +451,3 @@ class StudentAgent(Agent):
         '''
         def get_score(self, chess_board, pos):
             return len(self.get_valid_positions(chess_board, pos, pos, len(chess_board)*len(chess_board)))
-        
-    #    class MCSearchTree:  
-    #     def __init__(self, chess_board, my_pos, adv_pos, max_step, my_turn): 
-    #         self.my_pos = my_pos
-    #         self.chess_board = chess_board 
-    #         self.adv_pos = adv_pos 
-    #         self.max_step = max_step
-    #         self.nodes = []
-    #         self.dir_map = {
-    #             "u": 0,
-    #             "r": 1,
-    #             "d": 2,
-    #             "l": 3,
-    #         }
-        
-    #     '''COPY
-    #     Uses get_valid_positions to get a list of all reachable positions.
-    #     Then determines from each position what barriers can be placed and creates a list of all
-    #     position/barrier combinations that make up a move.
-    #     '''
-    #     def get_valid_moves(self, chess_board, og_pos, adv_pos, max_step):
-    #         moves = self.get_valid_positions(chess_board, og_pos, adv_pos, max_step)
-    #         moves_with_barrier = []
-    #         for move in moves:
-    #             if not chess_board[move[0]][move[1]][self.dir_map["u"]]:
-    #                 moves_with_barrier.append((move[0],move[1],self.dir_map["u"]))
-    #             if not chess_board[move[0]][move[1]][self.dir_map["d"]]:
-    #                 moves_with_barrier.append((move[0],move[1],self.dir_map["d"]))
-    #             if not chess_board[move[0]][move[1]][self.dir_map["l"]]:
-    #                 moves_with_barrier.append((move[0],move[1],self.dir_map["l"]))
-    #             if not chess_board[move[0]][move[1]][self.dir_map["r"]]:
-    #                 moves_with_barrier.append((move[0],move[1],self.dir_map["r"]))
-    #         return moves_with_barrier
-        
-    #     def search(self):
-    #         start = time.time()
-    #         #maybe check for game over here
-    #         valid_moves = self.get_valid_moves(self, self.chess_board, self.my_pos, self.adv_pos, self.max_step)
-    #         winrates =  np.zeros(len(valid_moves), dtype = int)
-
-    #         for moves in valid_moves:
-    #             move =  valid_moves.pop(random.randrange(len(valid_moves)))
-    #             new_board = deepcopy(self.chess_board)
-    #             self.set_barrier(self, move[0], move[1], move[2], new_board)
-    #             new_node = self.MCNode(new_board, (move[0], move[1]), move[2], self.adv_pos, self.max_step)
-    #             self.nodes.append(new_node)
-    #         while (time.time() - start) < self.duration:
-    #             for i in range(len(self.nodes)):
-    #                 self.nodes[i].simulate()
-    #                 winrates[i] = self.nodes[i].get_winrate()
-            
-    #         max_winrate= max(winrates)
-    #         champion_node = self.nodes[winrates.index(max_winrate)]
-    #         return champion_node.get_mypos(), champion_node.get_barrier()

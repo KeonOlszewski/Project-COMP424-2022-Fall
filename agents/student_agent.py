@@ -33,27 +33,36 @@ class StudentAgent(Agent):
 
     def step(self, chess_board, my_pos, adv_pos, max_step):
         start = time.time()
-        #maybe check for game over here
+
         valid_moves = self.get_valid_moves(chess_board, my_pos, adv_pos, max_step)
-        winrates =  np.zeros(len(valid_moves), dtype = int)
+        winrates = [0 for i in range(len(valid_moves))]
         nodes = []
 
         #make nodes for every valid move (might be overkill)
         for move in valid_moves:
-            move =  valid_moves.pop(random.randrange(len(valid_moves)))
+            #move =  valid_moves.pop(random.randrange(len(valid_moves)))
             new_board = deepcopy(chess_board)
             self.set_barrier(move[0], move[1], move[2], new_board)
             new_node = self.MCNode(new_board, (move[0], move[1]), move[2], adv_pos, max_step)
             nodes.append(new_node)
-        while (time.time() - start) < 1.75:
-            for i in range(len(nodes)): #while we have time simulate as many games of each node aqs possible
-                nodes[i].simulate()
-                winrates[i] = nodes[i].get_winrate()
-        
+        i = 0
+        while (time.time() - start) < 1.95:
+            nodes[i].simulate()
+            i = (i+1)%len(nodes)
+        for i in range(len(nodes)):
+            winrates[i] = nodes[i].get_winrate()
         max_winrate_index= np.argmax(winrates)
         champion_node = nodes[max_winrate_index]
+        print(winrates)
         return champion_node.get_mypos(), champion_node.get_barrier()
 
+    def tree_policy(self, chess_board, valid_moves, my_pos, adv_pos):
+        #pick best move to expand
+        return 1
+
+    def default_policy():
+        #expand simulation
+        return 1
 
     '''
     Currently for each valid moves gets the score of the board if that move was made.
@@ -180,7 +189,6 @@ class StudentAgent(Agent):
             my_pos, adv_pos = self.my_pos, self.adv_pos #positions of players
             chess_board = deepcopy(self.chess_board) #wall positions
             self.num_games = self.num_games = self.num_games + 1 #keep track of games
-        
             while True:
                 check_endgame = self.check_endgame(chess_board, my_pos, adv_pos)
                 if check_endgame is not None and check_endgame[0]: #check_endgame[0] is true if the game is over
@@ -192,15 +200,17 @@ class StudentAgent(Agent):
                     (x, y), dir = self.randmov(adv_pos, my_pos, chess_board)
                     adv_pos = (x, y)
                 if dir is None:
-                    self.winrate = self.num_wins / self.num_games
+                    if my_turn:
+                        self.winrate = self.num_wins / self.num_games
+                    else:
+                        self.num_wins += 1
+                        self.winrate = self.num_wins / self.num_games
                     return
                 my_turn = not my_turn # change turn
                 self.set_barrier(x, y, dir, chess_board)
-            
             if(check_endgame[1] > check_endgame[2]): #check if we won and update wins
                 self.num_wins = self.num_wins + 1
-            
-            self.winrate = self.num_wins / self.num_games #update winrate
+            self.winrate = self.num_wins/self.num_games #update winrate
         
         '''
         fetch winrate of node

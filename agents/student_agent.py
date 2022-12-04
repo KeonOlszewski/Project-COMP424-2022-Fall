@@ -41,8 +41,9 @@ class StudentAgent(Agent):
         winning_move = self.check_for_win(adv_pos, chess_board, valid_moves)
         if winning_move is not None:
             return winning_move
-        #prune list of valid moves to remove "bad moves"
-        valid_moves = self.prune(adv_pos, chess_board, valid_moves, max_step)
+        np.random.shuffle(valid_moves)
+        #prune list of valid moves to remove "bad moves" if it can be done in a <2 seconds
+        valid_moves = self.prune(adv_pos, chess_board, valid_moves, max_step, start, 29.98 if self.turn == 1 else 1.98)
         #if no good moves then just simulate with full list of moves incase something was missed
         if len(valid_moves) == 0:
             valid_moves = self.get_valid_moves(chess_board, my_pos, adv_pos, max_step)
@@ -55,7 +56,7 @@ class StudentAgent(Agent):
             self.root.children.append(new_node)
         #if first turn we can spend 30 seconds simulating moves
         if self.turn == 1:
-            while (time.time() - start) < 4.98:
+            while (time.time() - start) < 29.98:
                 node = self.tree_policy()
                 node.simulate()
             self.turn = 2
@@ -99,7 +100,7 @@ class StudentAgent(Agent):
     '''
     Checks through moves and removes moves which gives a winning move to opponent
     '''
-    def prune(self, adv_pos, chess_board, valid_moves, max_step):
+    def prune(self, adv_pos, chess_board, valid_moves, max_step, start, t):
         good_moves = []
         for move in valid_moves:
             board = deepcopy(chess_board)
@@ -112,6 +113,10 @@ class StudentAgent(Agent):
                     if self.get_score(sub_board, (sub_move[0],sub_move[1])) > self.get_score(sub_board, (move[0],move[1])):
                         bad_move = True
                         break
+                    if time.time() - start > t:
+                        break
+                if time.time() - start > t:
+                    break
                 if not bad_move:
                     good_moves.append(move)
         return good_moves

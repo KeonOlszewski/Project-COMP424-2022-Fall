@@ -69,7 +69,6 @@ class StudentAgent(Agent):
             winrates[i] = self.root.children[i].get_winrate()
         max_winrate_index= np.argmax(winrates)
         champion_node = self.root.children[max_winrate_index]
-        print(time.time() - start)
         return champion_node.get_mypos(), champion_node.get_barrier()
 
     '''

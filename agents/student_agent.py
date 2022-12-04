@@ -39,7 +39,13 @@ class StudentAgent(Agent):
 
         valid_moves = self.get_valid_moves(chess_board, my_pos, adv_pos, max_step)
         winrates = [0 for i in range(len(valid_moves))]
-
+        winning_move = self.check_for_win(adv_pos, chess_board, valid_moves)
+        if winning_move is not None:
+            return winning_move
+        valid_moves = self.prune(adv_pos, chess_board, valid_moves, max_step)
+        #if no good moves then just simulate with full list of moves incase something was missed
+        if len(valid_moves) == 0:
+            valid_moves = self.get_valid_moves(chess_board, my_pos, adv_pos, max_step)
         #make nodes for every valid move (might be overkill)
         self.root = self.MCNode(chess_board, my_pos, None, adv_pos, max_step, True, None)
         for move in valid_moves:
@@ -61,6 +67,7 @@ class StudentAgent(Agent):
             winrates[i] = self.root.children[i].get_winrate()
         max_winrate_index= np.argmax(winrates)
         champion_node = self.root.children[max_winrate_index]
+        print(num)
         moves = []
         for i in range(len(self.root.children)):
             moves.append(self.root.children[i].my_pos)
@@ -73,6 +80,31 @@ class StudentAgent(Agent):
             elif node.num_games < 5:
                 return node
         return self.root.children[random.randrange(len(self.root.children))]
+
+    def check_for_win(self, adv_pos, chess_board, valid_moves):
+        for move in valid_moves:
+            board = deepcopy(chess_board)
+            self.set_barrier(move[0],move[1],move[2],board)
+            if self.get_score(board, (move[0],move[1])) > self.get_score(board, adv_pos):
+                return (move[0],move[1]),move[2]
+        return None
+
+    def prune(self, adv_pos, chess_board, valid_moves, max_step):
+        good_moves = []
+        for move in valid_moves:
+            board = deepcopy(chess_board)
+            self.set_barrier(move[0],move[1],move[2],board)
+            if self.get_score(board, (move[0],move[1])) >= self.get_score(board, adv_pos):
+                bad_move = False
+                for sub_move in self.get_valid_moves(board, adv_pos, (move[0],move[1]), max_step):
+                    sub_board = deepcopy(board)
+                    self.set_barrier(sub_move[0],sub_move[1],sub_move[2],sub_board)
+                    if self.get_score(sub_board, (sub_move[0],sub_move[1])) > self.get_score(sub_board, (move[0],move[1])):
+                        bad_move = True
+                        break
+                if not bad_move:
+                    good_moves.append(move)
+        return good_moves
 
     '''
     Currently for each valid moves gets the score of the board if that move was made.
@@ -418,7 +450,7 @@ class StudentAgent(Agent):
         Need to set the adv position to your position so the adversary doesn't block any positions.
         '''
         def get_score(self, chess_board, pos):
-            return len(self.get_valid_positions(chess_board, pos, pos, 2*len(chess_board)))
+            return len(self.get_valid_positions(chess_board, pos, pos, len(chess_board)*len(chess_board)))
         
     #    class MCSearchTree:  
     #     def __init__(self, chess_board, my_pos, adv_pos, max_step, my_turn): 

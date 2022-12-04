@@ -19,6 +19,9 @@ class StudentAgent(Agent):
         super(StudentAgent, self).__init__()
         self.name = "StudentAgent"
         self.autoplay = True
+        self.root = None
+        self.turn = 1
+        self.previous_board = None
         self.dir_map = {
             "u": 0,
             "r": 1,
@@ -36,33 +39,40 @@ class StudentAgent(Agent):
 
         valid_moves = self.get_valid_moves(chess_board, my_pos, adv_pos, max_step)
         winrates = [0 for i in range(len(valid_moves))]
-        nodes = []
 
         #make nodes for every valid move (might be overkill)
+        self.root = self.MCNode(chess_board, my_pos, None, adv_pos, max_step, True, None)
         for move in valid_moves:
-            #move =  valid_moves.pop(random.randrange(len(valid_moves)))
             new_board = deepcopy(chess_board)
             self.set_barrier(move[0], move[1], move[2], new_board)
-            new_node = self.MCNode(new_board, (move[0], move[1]), move[2], adv_pos, max_step)
-            nodes.append(new_node)
-        i = 0
+            new_node = self.MCNode(new_board, (move[0], move[1]), move[2], adv_pos, max_step, False, self.root)
+            self.root.children.append(new_node)
+        if self.turn == 1:
+            while (time.time() - start) < 0: #CHANGE TO 28 FOR FINAL VERSION
+                node = self.tree_policy()
+                node.simulate()
+            self.turn = 2
+        num = 0
         while (time.time() - start) < 1.95:
-            nodes[i].simulate()
-            i = (i+1)%len(nodes)
-        for i in range(len(nodes)):
-            winrates[i] = nodes[i].get_winrate()
+            node = self.tree_policy()
+            node.simulate()
+            num += 1
+        for i in range(len(self.root.children)):
+            winrates[i] = self.root.children[i].get_winrate()
         max_winrate_index= np.argmax(winrates)
-        champion_node = nodes[max_winrate_index]
-        print(winrates)
+        champion_node = self.root.children[max_winrate_index]
+        moves = []
+        for i in range(len(self.root.children)):
+            moves.append(self.root.children[i].my_pos)
         return champion_node.get_mypos(), champion_node.get_barrier()
 
-    def tree_policy(self, chess_board, valid_moves, my_pos, adv_pos):
-        #pick best move to expand
-        return 1
-
-    def default_policy():
-        #expand simulation
-        return 1
+    def tree_policy(self):
+        for node in self.root.children:
+            if node.winrate > 0.9 and node.num_games < 30:
+                return node
+            elif node.num_games < 5:
+                return node
+        return self.root.children[random.randrange(len(self.root.children))]
 
     '''
     Currently for each valid moves gets the score of the board if that move was made.
@@ -87,7 +97,7 @@ class StudentAgent(Agent):
     Need to set the adv position to your position so the adversary doesn't block any positions.
     '''
     def get_score(self, chess_board, pos):
-        return len(self.get_valid_positions(chess_board, pos, pos, 2*len(chess_board)))
+        return len(self.get_valid_positions(chess_board, pos, pos, len(chess_board)*len(chess_board)))
 
     '''
     Given a position on the board, returns a list of adjacent open positions.
@@ -161,11 +171,13 @@ class StudentAgent(Agent):
       return chess_board
              
     class MCNode:  
-        def __init__(self, chess_board, my_pos, barrier, adv_pos, max_step):
+        def __init__(self, chess_board, my_pos, barrier, adv_pos, max_step, my_turn, root):
+            self.parent = root
+            self.children = []
             self.chess_board = chess_board 
+            self.my_turn = my_turn
             self.my_pos = my_pos
             self.barrier = barrier
-            self.chess_board = chess_board 
             self.adv_pos = adv_pos 
             self.max_step = max_step
             self.num_games = 0
@@ -177,6 +189,16 @@ class StudentAgent(Agent):
                 "d": 2,
                 "l": 3,
             }
+
+        def default_policy(self, my_pos, adv_pos, chess_board):
+            return self.randmov(my_pos, adv_pos, chess_board)
+            valid_moves = self.get_valid_moves(chess_board, my_pos, adv_pos, self.max_step)
+            for move in valid_moves:
+                board = deepcopy(chess_board)
+                self.set_barrier(move[0],move[1],move[2],board)
+                if self.get_score(board, (move[0],move[1])) > self.get_score(board, adv_pos):
+                    return (move[0],move[1]),move[2]
+            return self.randmov(my_pos, adv_pos, chess_board)
         
         '''
         randomly makes moves for us and the opponent until game is over
@@ -184,7 +206,7 @@ class StudentAgent(Agent):
         '''
         def simulate(self):
 
-            my_turn = True # to keep track of turns initially true
+            my_turn = self.my_turn # to keep track of turns initially true
             check_endgame = None
             my_pos, adv_pos = self.my_pos, self.adv_pos #positions of players
             chess_board = deepcopy(self.chess_board) #wall positions
@@ -194,10 +216,10 @@ class StudentAgent(Agent):
                 if check_endgame is not None and check_endgame[0]: #check_endgame[0] is true if the game is over
                     break
                 elif my_turn:
-                    (x, y), dir = self.randmov(my_pos, adv_pos, chess_board)
+                    (x, y), dir = self.default_policy(my_pos, adv_pos, chess_board)
                     my_pos = (x, y)
                 else:
-                    (x, y), dir = self.randmov(adv_pos, my_pos, chess_board)
+                    (x, y), dir = self.default_policy(adv_pos, my_pos, chess_board)
                     adv_pos = (x, y)
                 if dir is None:
                     if my_turn:
@@ -331,6 +353,72 @@ class StudentAgent(Agent):
             move = moves[dir]
             chess_board[r + move[0], c + move[1], opposites[dir]] = True
             return chess_board
+        
+        '''
+        Given a position on the board, returns a list of adjacent open positions.
+        Takes into account max step size, adv position, barriers and the current valid moves list 
+        (so as not to include duplicates)
+        '''
+        def get_moves_from_position(self, chess_board, pos, adv_pos, max_step, moves, steps):
+            #Up, Right, Down, Left
+            #(-1, 0), (0, 1), (1, 0), (0, -1)
+            x = pos[0]
+            y = pos[1]
+            steps = pos[2]
+            new_moves = []
+            if steps + 1 > max_step:
+                return []
+            if not chess_board[x][y][self.dir_map["u"]] and (x-1, y) not in moves and not (x-1, y) == adv_pos:
+                new_moves.append((x-1, y, steps+1))
+            if not chess_board[x][y][self.dir_map["r"]] and (x, y+1) not in moves and not (x, y+1) == adv_pos:
+                new_moves.append((x, y+1, steps+1))
+            if not chess_board[x][y][self.dir_map["d"]] and (x+1, y) not in moves and not (x+1, y) == adv_pos:
+                new_moves.append((x+1, y, steps+1))
+            if not chess_board[x][y][self.dir_map["l"]] and (x, y-1) not in moves and not (x, y-1) == adv_pos:
+                new_moves.append((x, y-1, steps+1))
+            return new_moves
+
+        '''
+        Continuously calls the get_moves_from_position function on each new position found until all
+        reachable positions have been found
+        '''
+        def get_valid_positions(self, chess_board, og_pos, adv_pos, max_step):
+            moves = [og_pos]
+            new_moves = [(og_pos[0],og_pos[1],0)] #starting position with 0 steps so far
+            while len(new_moves) > 0:
+                move = new_moves[0]
+                new_moves = new_moves[1:]
+                new = self.get_moves_from_position(chess_board, move, adv_pos, max_step, moves, new_moves)
+                for move in new:
+                    moves.append((move[0], move[1]))
+                new_moves += new
+            return moves
+        
+        '''
+        Uses get_valid_positions to get a list of all reachable positions.
+        Then determines from each position what barriers can be placed and creates a list of all
+        position/barrier combinations that make up a move.
+        '''
+        def get_valid_moves(self, chess_board, og_pos, adv_pos, max_step):
+            moves = self.get_valid_positions(chess_board, og_pos, adv_pos, max_step)
+            moves_with_barrier = []
+            for move in moves:
+                if not chess_board[move[0]][move[1]][self.dir_map["u"]]:
+                    moves_with_barrier.append((move[0],move[1],self.dir_map["u"]))
+                if not chess_board[move[0]][move[1]][self.dir_map["d"]]:
+                    moves_with_barrier.append((move[0],move[1],self.dir_map["d"]))
+                if not chess_board[move[0]][move[1]][self.dir_map["l"]]:
+                    moves_with_barrier.append((move[0],move[1],self.dir_map["l"]))
+                if not chess_board[move[0]][move[1]][self.dir_map["r"]]:
+                    moves_with_barrier.append((move[0],move[1],self.dir_map["r"]))
+            return moves_with_barrier
+        
+        '''
+        Score is identical to number of reachable positions given a max step size 2*board_size (full board).
+        Need to set the adv position to your position so the adversary doesn't block any positions.
+        '''
+        def get_score(self, chess_board, pos):
+            return len(self.get_valid_positions(chess_board, pos, pos, 2*len(chess_board)))
         
     #    class MCSearchTree:  
     #     def __init__(self, chess_board, my_pos, adv_pos, max_step, my_turn): 

@@ -1,8 +1,6 @@
 # Student agent: Add your own agent here
 from agents.agent import Agent
 from store import register_agent
-import sys
-import random
 from copy import deepcopy
 import numpy as np
 import time
@@ -85,7 +83,7 @@ class StudentAgent(Agent):
                 return node
             elif node.num_games < 5:
                 return node
-        return self.root.children[random.randrange(len(self.root.children))]
+        return self.root.children[np.random.randint(0,len(self.root.children))]
 
     '''
     Checks through moves for a move which wins.
